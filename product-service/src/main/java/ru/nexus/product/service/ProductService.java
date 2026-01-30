@@ -14,12 +14,12 @@ import org.springframework.data.domain.Pageable;
 public class ProductService {
     private final ProductRepository repository;
 
-    public Page<ProductResponse> findAll(Pageable pageable) {
+    public Page<ProductResponse> getAllProducts(Pageable pageable) {
         return repository.findAll(pageable)
                 .map(this::mapToResponse);
     }
 
-    public ProductResponse findById(String id) {
+    public ProductResponse getProductById(String id) {
         Product product = repository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Product not found with id: " + id));
         return mapToResponse(product);
