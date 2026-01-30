@@ -44,6 +44,13 @@ public class ProductService {
         return mapToResponse(updatedProduct);
     }
 
+    public void deleteProduct(String id) {
+        if (!repository.existsById(id)) {
+            throw new RuntimeException("Cannot delete. Product not found with id: " + id);
+        }
+        repository.deleteById(id);
+    }
+
     private ProductResponse mapToResponse(Product product) {
         return new ProductResponse(
                 product.getId(),
