@@ -10,9 +10,14 @@ import ru.nexus.product.repository.ProductRepository;
 @Service
 @RequiredArgsConstructor
 public class ProductService {
-    // CRUD operations
 
     private final ProductRepository repository;
+
+    public ProductResponse findById(String id) {
+        Product product = repository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Product not found with id: " + id));
+        return mapToResponse(product);
+    }
 
     public ProductResponse createProduct(ProductRequest productRequest) {
         if (productRequest == null) {
