@@ -6,12 +6,18 @@ import ru.nexus.product.dto.ProductRequest;
 import ru.nexus.product.dto.ProductResponse;
 import ru.nexus.product.entity.Product;
 import ru.nexus.product.repository.ProductRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 @Service
 @RequiredArgsConstructor
 public class ProductService {
-
     private final ProductRepository repository;
+
+    public Page<ProductResponse> findAll(Pageable pageable) {
+        return repository.findAll(pageable)
+                .map(this::mapToResponse);
+    }
 
     public ProductResponse findById(String id) {
         Product product = repository.findById(id)
