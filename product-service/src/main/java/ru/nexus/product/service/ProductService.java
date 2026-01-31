@@ -5,6 +5,7 @@ import org.springframework.stereotype.Service;
 import ru.nexus.product.dto.ProductRequest;
 import ru.nexus.product.dto.ProductResponse;
 import ru.nexus.product.entity.Product;
+import ru.nexus.product.exception.ProductNotFoundException;
 import ru.nexus.product.repository.ProductRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -21,15 +22,11 @@ public class ProductService {
 
     public ProductResponse getProductById(String id) {
         Product product = repository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Product not found with id: " + id));
+                .orElseThrow(() -> new ProductNotFoundException(id));
         return mapToResponse(product);
     }
 
     public ProductResponse createProduct(ProductRequest productRequest) {
-        if (productRequest == null) {
-            throw new IllegalArgumentException("ProductRequest cannot be null");
-            //TODO: Custom Exceptions + Exception Handler
-        }
         Product product = Product.builder()
                 .title(productRequest.getTitle())
                 .price(productRequest.getPrice())
@@ -43,7 +40,7 @@ public class ProductService {
 
     public ProductResponse updateProduct(String id, ProductRequest productRequest) {
         Product product = repository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Product not found with id: " + id));
+                .orElseThrow(() -> new ProductNotFoundException(id));
 
         product.setTitle(productRequest.getTitle());
         product.setPrice(productRequest.getPrice());
@@ -57,7 +54,7 @@ public class ProductService {
 
     public void deleteProduct(String id) {
         if (!repository.existsById(id)) {
-            throw new RuntimeException("Cannot delete. Product not found with id: " + id);
+            throw new ProductNotFoundException(id);
         }
         repository.deleteById(id);
     }
