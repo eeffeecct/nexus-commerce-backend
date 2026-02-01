@@ -17,6 +17,7 @@ import java.util.Map;
 public class GlobalHandlerException {
     @ExceptionHandler
     public ResponseEntity<ErrorResponse> handleProduceNotFound(ProductNotFoundException ex) {
+        log.warn("ProductNotFoundException: {}", ex.getMessage());
         return ResponseEntity
                 .status(HttpStatus.NOT_FOUND)
                 .body(new ErrorResponse(
@@ -35,6 +36,7 @@ public class GlobalHandlerException {
             errors.put(fieldName, errorMessage);
         });
 
+        log.info("Validation failed: {}", errors);
         return ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)
                 .body(new ErrorResponse(

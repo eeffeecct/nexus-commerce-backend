@@ -11,7 +11,7 @@ public record ErrorResponse(
         LocalDateTime timestamp,
         Map<String, String> errors
 ) {
-    // Конструктор для обычных ошибок (без валидации)
+
     public ErrorResponse(int status, String message, LocalDateTime timestamp) {
         this(status, message, timestamp, null);
     }
