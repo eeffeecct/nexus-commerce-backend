@@ -1,6 +1,9 @@
 package ru.nexus.product.service;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.CachePut;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import ru.nexus.product.dto.ProductRequest;
 import ru.nexus.product.dto.ProductResponse;
@@ -20,12 +23,14 @@ public class ProductService {
                 .map(this::mapToResponse);
     }
 
+    @Cacheable(value = "products", key="#id")
     public ProductResponse getProductById(String id) {
         Product product = repository.findById(id)
                 .orElseThrow(() -> new ProductNotFoundException(id));
         return mapToResponse(product);
     }
 
+    @CachePut(value = "products", key="#result.id")
     public ProductResponse createProduct(ProductRequest productRequest) {
         Product product = Product.builder()
                 .title(productRequest.getTitle())
@@ -38,6 +43,7 @@ public class ProductService {
         return mapToResponse(savedProduct);
     }
 
+    @CacheEvict(value = "products", key="#id")
     public ProductResponse updateProduct(String id, ProductRequest productRequest) {
         Product product = repository.findById(id)
                 .orElseThrow(() -> new ProductNotFoundException(id));
@@ -52,10 +58,8 @@ public class ProductService {
         return mapToResponse(updatedProduct);
     }
 
+    @CacheEvict(value = "products", key="#id")
     public void deleteProduct(String id) {
-        if (!repository.existsById(id)) {
-            throw new ProductNotFoundException(id);
-        }
         repository.deleteById(id);
     }
 
