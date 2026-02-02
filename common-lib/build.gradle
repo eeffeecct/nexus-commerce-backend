@@ -1,6 +1,16 @@
+plugins {
+    id 'java-test-fixtures'
+}
+
 bootJar { enabled = false }
 jar { enabled = true }
 
 dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-validation'
+
+    testFixturesApi 'org.springframework.boot:spring-boot-starter-test'
+    testFixturesApi 'org.testcontainers:junit-jupiter'
+    testFixturesApi 'org.testcontainers:mongodb'
+    testFixturesApi 'org.testcontainers:postgresql'
+    testFixturesApi 'org.testcontainers:rabbitmq'
 }

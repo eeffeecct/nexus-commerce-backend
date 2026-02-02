@@ -33,6 +33,7 @@ subprojects {
         annotationProcessor 'org.projectlombok:lombok:1.18.30'
         testImplementation 'org.springframework.boot:spring-boot-starter-test'
         testImplementation 'org.testcontainers:junit-jupiter'
+        testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
     }
 
     test {
