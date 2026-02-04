@@ -10,6 +10,7 @@ import ru.nexus.product.dto.ProductRequest;
 import ru.nexus.product.dto.ProductResponse;
 import ru.nexus.product.entity.Product;
 import ru.nexus.product.exception.ProductNotFoundException;
+import ru.nexus.product.mapper.ProductMapper;
 import ru.nexus.product.repository.ProductRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -19,11 +20,12 @@ import org.springframework.data.domain.Pageable;
 @RequiredArgsConstructor
 public class ProductService {
     private final ProductRepository repository;
+    private final ProductMapper mapper;
 
     public Page<ProductResponse> getAllProducts(Pageable pageable) {
         log.info("Fetching all products with pagination: {}", pageable);
         return repository.findAll(pageable)
-                .map(this::mapToResponse);
+                .map(mapper::toResponse);
     }
 
     @Cacheable(value = "products", key="#id")
@@ -31,21 +33,15 @@ public class ProductService {
         log.info("Fetching product by ID: {} (Cache miss if you see this)", id);
         Product product = repository.findById(id)
                 .orElseThrow(() -> new ProductNotFoundException(id));
-        return mapToResponse(product);
+        return mapper.toResponse(product);
     }
 
     public ProductResponse createProduct(ProductRequest productRequest) {
         log.info("Creating new product with title: {}", productRequest.getTitle());
-        Product product = Product.builder()
-                .title(productRequest.getTitle())
-                .price(productRequest.getPrice())
-                .quantity(productRequest.getQuantity())
-                .category(productRequest.getCategory())
-                .attributes(productRequest.getAttributes())
-                .build();
+        Product product = mapper.toEntity(productRequest);
         Product savedProduct = repository.save(product);
         log.info("Product created successfully with ID: {}", savedProduct.getId());
-        return mapToResponse(savedProduct);
+        return mapper.toResponse(savedProduct);
     }
 
     @CachePut(value = "products", key="#id")
@@ -54,15 +50,11 @@ public class ProductService {
         Product product = repository.findById(id)
                 .orElseThrow(() -> new ProductNotFoundException(id));
 
-        product.setTitle(productRequest.getTitle());
-        product.setPrice(productRequest.getPrice());
-        product.setQuantity(productRequest.getQuantity());
-        product.setCategory(productRequest.getCategory());
-        product.setAttributes(productRequest.getAttributes());
+        mapper.updateEntity(productRequest, product);
 
         Product updatedProduct = repository.save(product);
         log.info("Product updated successfully: {}", id);
-        return mapToResponse(updatedProduct);
+        return mapper.toResponse(updatedProduct);
     }
 
     @CacheEvict(value = "products", key="#id")
@@ -74,16 +66,5 @@ public class ProductService {
         }
         repository.deleteById(id);
         log.info("Product deleted successfully: {}", id);
-    }
-
-    private ProductResponse mapToResponse(Product product) {
-        return new ProductResponse(
-                product.getId(),
-                product.getTitle(),
-                product.getPrice(),
-                product.getQuantity(),
-                product.getCategory(),
-                product.getAttributes()
-        );
     }
 }
