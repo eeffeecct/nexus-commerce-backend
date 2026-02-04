@@ -190,6 +190,34 @@ class ProductIntegrationTest {
     }
     
     @Test
+    @DisplayName("Should throw exception on concurrent update (Optimistic Locking)")
+    void concurrentUpdate() {
+        // 1. Initial save (Version = 0)
+        Product savedProduct = productRepository.save(Product.builder()
+                .title("Concurrent Item")
+                .price(BigDecimal.TEN)
+                .quantity(10)
+                .category("Test")
+                .build());
+
+        // 2. Simulate two admins reading the same product
+        Product admin1Product = productRepository.findById(savedProduct.getId()).orElseThrow();
+        Product admin2Product = productRepository.findById(savedProduct.getId()).orElseThrow();
+
+        // 3. Admin 1 updates and saves (Version becomes 1)
+        admin1Product.setPrice(BigDecimal.valueOf(20));
+        productRepository.save(admin1Product);
+
+        // 4. Admin 2 updates the OLD version (still thinks Version is 0)
+        admin2Product.setQuantity(5);
+
+        // 5. Admin 2 tries to save -> Should fail
+        org.junit.jupiter.api.Assertions.assertThrows(org.springframework.dao.OptimisticLockingFailureException.class, () -> {
+            productRepository.save(admin2Product);
+        });
+    }
+
+    @Test
     @DisplayName("Should get all products")
     void getAll() throws Exception {
         productRepository.save(Product.builder().title("P1").price(BigDecimal.TEN).quantity(1).category("C").build());
