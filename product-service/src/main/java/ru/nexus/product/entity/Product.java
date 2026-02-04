@@ -5,6 +5,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.Version;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.math.BigDecimal;
@@ -23,4 +24,6 @@ public class Product {
     private Integer quantity;
     private String category;
     private Map<String, Object> attributes;
+    @Version
+    private Long version;
 }

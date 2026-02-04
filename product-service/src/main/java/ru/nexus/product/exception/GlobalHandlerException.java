@@ -3,6 +3,7 @@ package ru.nexus.product.exception;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -15,6 +16,19 @@ import java.util.Map;
 @Slf4j
 @RestControllerAdvice
 public class GlobalHandlerException {
+
+    @ExceptionHandler(OptimisticLockingFailureException.class)
+    public ResponseEntity<ErrorResponse> handleOptimisticLocking(OptimisticLockingFailureException ex) {
+        log.warn("OptimisticLockingFailureException: {}", ex.getMessage());
+        return ResponseEntity
+                .status(HttpStatus.CONFLICT)
+                .body(new ErrorResponse(
+                        HttpStatus.CONFLICT.value(),
+                        "The resource has been updated by another user. Please refresh and try again.",
+                        LocalDateTime.now()
+                ));
+    }
+
     @ExceptionHandler
     public ResponseEntity<ErrorResponse> handleProduceNotFound(ProductNotFoundException ex) {
         log.warn("ProductNotFoundException: {}", ex.getMessage());
