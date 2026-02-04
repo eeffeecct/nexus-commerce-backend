@@ -24,7 +24,6 @@ public class Product {
     private String id;
     private String title;
     private BigDecimal price;
-    private Integer quantity;
     private String category;
     private Map<String, Object> attributes;
     @Version

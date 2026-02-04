@@ -70,7 +70,6 @@ class ProductIntegrationTest {
         ProductRequest productRequest = ProductRequest.builder()
                 .title("iPhone 15")
                 .price(BigDecimal.valueOf(1200))
-                .quantity(10)
                 .category("Electronics")
                 .build();
 
@@ -95,7 +94,6 @@ class ProductIntegrationTest {
         ProductRequest invalidRequest = ProductRequest.builder()
                 .title("Bad Product")
                 .price(BigDecimal.valueOf(-500))
-                // .quantity(5) // Missing -> @NotNull
                 // .category("Test") // Missing -> @NotBlank
                 .build();
 
@@ -104,7 +102,6 @@ class ProductIntegrationTest {
                         .content(objectMapper.writeValueAsString(invalidRequest)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errors.price").exists())
-                .andExpect(jsonPath("$.errors.quantity").exists())
                 .andExpect(jsonPath("$.errors.category").exists());
         
         assertThat(productRepository.findAll()).isEmpty();
@@ -126,7 +123,6 @@ class ProductIntegrationTest {
         ProductRequest request = ProductRequest.builder()
                 .title("Cached Item")
                 .price(BigDecimal.TEN)
-                .quantity(1)
                 .category("Test")
                 .build();
 
@@ -152,14 +148,12 @@ class ProductIntegrationTest {
         Product savedProduct = productRepository.save(Product.builder()
                 .title("Old Title")
                 .price(BigDecimal.TEN)
-                .quantity(1)
                 .category("Old Cat")
                 .build());
 
         ProductRequest updateRequest = ProductRequest.builder()
                 .title("New Title")
                 .price(BigDecimal.valueOf(20))
-                .quantity(2)
                 .category("New Cat")
                 .build();
 
@@ -177,7 +171,7 @@ class ProductIntegrationTest {
     @DisplayName("Should delete product and evict cache")
     void deleteProduct() throws Exception {
         Product savedProduct = productRepository.save(Product.builder()
-                .title("To Delete").price(BigDecimal.TEN).quantity(1).category("Del").build());
+                .title("To Delete").price(BigDecimal.TEN).category("Del").build());
         
         mockMvc.perform(get("/api/v1/products/{id}", savedProduct.getId()));
         assertThat(redisTemplate.hasKey("products::" + savedProduct.getId())).isTrue();
@@ -196,7 +190,6 @@ class ProductIntegrationTest {
         Product savedProduct = productRepository.save(Product.builder()
                 .title("Concurrent Item")
                 .price(BigDecimal.TEN)
-                .quantity(10)
                 .category("Test")
                 .build());
 
@@ -209,19 +202,17 @@ class ProductIntegrationTest {
         productRepository.save(admin1Product);
 
         // 4. Admin 2 updates the OLD version (still thinks Version is 0)
-        admin2Product.setQuantity(5);
+        admin2Product.setTitle("Conflict Title");
 
         // 5. Admin 2 tries to save -> Should fail
-        org.junit.jupiter.api.Assertions.assertThrows(org.springframework.dao.OptimisticLockingFailureException.class, () -> {
-            productRepository.save(admin2Product);
-        });
+        org.junit.jupiter.api.Assertions.assertThrows(org.springframework.dao.OptimisticLockingFailureException.class, () -> productRepository.save(admin2Product));
     }
 
     @Test
     @DisplayName("Should get all products")
     void getAll() throws Exception {
-        productRepository.save(Product.builder().title("P1").price(BigDecimal.TEN).quantity(1).category("C").build());
-        productRepository.save(Product.builder().title("P2").price(BigDecimal.TEN).quantity(1).category("C").build());
+        productRepository.save(Product.builder().title("P1").price(BigDecimal.TEN).category("C").build());
+        productRepository.save(Product.builder().title("P2").price(BigDecimal.TEN).category("C").build());
 
         mockMvc.perform(get("/api/v1/products")
                         .contentType(MediaType.APPLICATION_JSON))
