@@ -10,6 +10,8 @@ import org.springframework.stereotype.Repository;
 import ru.nexus.inventory.entity.Inventory;
 
 import java.sql.PreparedStatement;
+import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
 
 @Repository
@@ -35,8 +37,16 @@ public class InventoryRepository {
         }
     }
 
+    public List<Inventory> findAllBySkuCodeIn(List<String> skuCodes) {
+        if (skuCodes == null || skuCodes.isEmpty()) {
+            return Collections.emptyList();
+        }
+        String placeholders = String.join(",", Collections.nCopies(skuCodes.size(), "?"));
+        String sql = "SELECT * FROM t_inventory WHERE sku_code IN (" + placeholders + ")";
+        return jdbcTemplate.query(sql, inventoryRowMapper, skuCodes.toArray());
+    }
+
     public Optional<Inventory> findBySkuCodeAndQuantityGreaterThanEqual(String skuCode, Integer quantity) {
-        // Implementing pessimistic lock using SELECT ... FOR UPDATE
         String sql = "SELECT * FROM t_inventory WHERE sku_code = ? AND quantity >= ? FOR UPDATE";
         try {
             Inventory inventory = jdbcTemplate.queryForObject(sql, inventoryRowMapper, skuCode, quantity);
@@ -52,7 +62,7 @@ public class InventoryRepository {
         return count != null && count > 0;
     }
 
-    public void save(Inventory inventory) {
+    public void saveInventory(Inventory inventory) {
         if (inventory.getId() == null) {
             String sql = "INSERT INTO t_inventory (sku_code, quantity, version) VALUES (?, ?, 0)";
             KeyHolder keyHolder = new GeneratedKeyHolder();
@@ -79,10 +89,21 @@ public class InventoryRepository {
                     inventory.getVersion());
 
             if (rowsAffected == 0) {
-                throw new RuntimeException("Optimistic lock failed: Record was updated by another user");
+                throw new RuntimeException("Optimistic lock failed: Record was updated by another user or version mismatch");
             }
 
             inventory.setVersion(inventory.getVersion() + 1);
         }
+    }
+
+    public int updateQuantity(String skuCode, Integer delta) {
+        String sql = "UPDATE t_inventory SET quantity = quantity + ? " +
+                     "WHERE sku_code = ? AND (quantity + ?) >= 0";
+        return jdbcTemplate.update(sql, delta, skuCode, delta);
+    }
+
+    public void deleteBySkuCode(String skuCode) {
+        String sql = "DELETE FROM t_inventory WHERE sku_code = ?";
+        jdbcTemplate.update(sql, skuCode);
     }
 }
