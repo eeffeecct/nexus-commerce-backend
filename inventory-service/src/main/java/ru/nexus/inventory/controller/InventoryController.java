@@ -15,8 +15,8 @@ public class InventoryController {
 
     @GetMapping("/{skuCode}")
     @ResponseStatus(HttpStatus.OK)
-    public InventoryResponse isInStock(@PathVariable String skuCode) {
-        return inventoryService.isInStock(skuCode);
+    public InventoryResponse getInventory(@PathVariable String skuCode) {
+        return inventoryService.getStockStatus(skuCode);
     }
 
     // Временный эндпоинт для тестов, позже уберем и заменим на EventListener

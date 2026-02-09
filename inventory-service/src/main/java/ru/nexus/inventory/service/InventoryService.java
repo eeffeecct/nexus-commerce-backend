@@ -1,8 +1,8 @@
 package ru.nexus.inventory.service;
 
-import lombok.AllArgsConstructor;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.nexus.inventory.dto.InventoryResponse;
@@ -16,7 +16,7 @@ public class InventoryService {
     private final InventoryRepository inventoryRepository;
 
     @Transactional(readOnly = true)
-    public InventoryResponse isInStock(String skuCode) {
+    public InventoryResponse getStockStatus(String skuCode) {
         return inventoryRepository.findBySkuCode(skuCode)
                 .map(inventory -> InventoryResponse.builder()
                         .skuCode(inventory.getSkuCode())
@@ -32,13 +32,14 @@ public class InventoryService {
 
     @Transactional
     public void initStock(String skuCode) {
-        if (inventoryRepository.existsBySkuCode(skuCode)) {
-            log.warn("Stock for skuCode {} already exists", skuCode);
-            return;
+        try {
+            Inventory inventory = Inventory.builder()
+                    .skuCode(skuCode)
+                    .quantity(0)
+                    .build();
+            inventoryRepository.save(inventory);
+        } catch (DuplicateKeyException e) {
+            log.warn("Stock for skuCode {} already exists (Race Condition avoided)", skuCode);
         }
-        inventoryRepository.save(Inventory.builder()
-                .skuCode(skuCode)
-                .quantity(0)
-                .build());
     }
 }
