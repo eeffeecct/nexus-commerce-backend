@@ -29,7 +29,7 @@ public class GlobalHandlerException {
                 ));
     }
 
-    @ExceptionHandler
+    @ExceptionHandler(ProductNotFoundException.class)
     public ResponseEntity<ErrorResponse> handleProduceNotFound(ProductNotFoundException ex) {
         log.warn("ProductNotFoundException: {}", ex.getMessage());
         return ResponseEntity
