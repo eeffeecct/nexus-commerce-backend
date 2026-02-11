@@ -17,6 +17,9 @@ spring:
     timeout-per-shutdown-phase: 20s
   application:
     name: product-service
+  mvc:
+    problem-details:
+      enabled: true
   data:
     mongodb:
       uri: mongodb://${MONGO_USER}:${MONGO_PASSWORD}@${MONGO_HOST:localhost}:27017/${MONGO_DATABASE:product_db}?authSource=admin
