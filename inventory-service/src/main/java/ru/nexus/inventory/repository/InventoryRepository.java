@@ -80,10 +80,10 @@ public class InventoryRepository {
 
     private void update(Inventory inventory) {
         String sql = """
-                UPDATE t_inventory 
-                SET sku_code = ?, quantity = ?, version = version + 1 
+                UPDATE t_inventory\s
+                SET sku_code = ?, quantity = ?, version = version + 1\s
                 WHERE id = ? AND version = ?
-                """;
+               \s""";
 
         int rowsAffected = jdbcTemplate.update(sql,
                 inventory.getSkuCode(),
@@ -100,10 +100,10 @@ public class InventoryRepository {
 
     public int updateQuantity(String skuCode, Integer delta) {
         String sql = """
-                UPDATE t_inventory 
-                SET quantity = quantity + ? 
+                UPDATE t_inventory\s
+                SET quantity = quantity + ?\s
                 WHERE sku_code = ? AND (quantity + ?) >= 0
-                """;
+               \s""";
 
         return jdbcTemplate.update(sql, delta, skuCode, delta);
     }
