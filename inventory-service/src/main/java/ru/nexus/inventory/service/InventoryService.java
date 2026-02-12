@@ -8,10 +8,11 @@ import org.springframework.transaction.annotation.Transactional;
 import ru.nexus.inventory.dto.InventoryRequest;
 import ru.nexus.inventory.dto.InventoryResponse;
 import ru.nexus.inventory.entity.Inventory;
+import ru.nexus.inventory.exception.InsufficientStockException;
+import ru.nexus.inventory.exception.InventoryNotFoundException;
 import ru.nexus.inventory.repository.InventoryRepository;
 
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -36,7 +37,7 @@ public class InventoryService {
         log.info("Checking stock statuses for: {}", skuCodes);
         return inventoryRepository.findAllBySkuCodeIn(skuCodes).stream()
                 .map(this::mapToResponse)
-                .collect(Collectors.toList());
+                .toList();
     }
 
     @Transactional
@@ -58,7 +59,7 @@ public class InventoryService {
         log.info("Updating inventory for skuCode: {}", request.getSkuCode());
         
         Inventory inventory = inventoryRepository.findBySkuCode(request.getSkuCode())
-                .orElseThrow(() -> new RuntimeException("Inventory not found for skuCode: " + request.getSkuCode()));
+                .orElseThrow(() -> new InventoryNotFoundException("Inventory not found for skuCode: " + request.getSkuCode()));
 
         inventory.setQuantity(request.getQuantity());
         inventory.setVersion(request.getVersion());
@@ -69,16 +70,32 @@ public class InventoryService {
     @Transactional
     public void adjustStock(String skuCode, Integer delta) {
         log.info("Adjusting stock for skuCode: {} by delta: {}", skuCode, delta);
+
         int rowsAffected = inventoryRepository.updateQuantity(skuCode, delta);
-        if (rowsAffected == 0) {
-            throw new RuntimeException("Stock adjustment failed. Product not found or insufficient quantity.");
+
+        if (rowsAffected > 0) {
+            return;
         }
+
+        log.warn("Stock adjustment failed. Diagnosing cause for sku: {}", skuCode);
+
+        boolean exists = inventoryRepository.existsBySkuCode(skuCode);
+
+        if (!exists) {
+            throw new InventoryNotFoundException("Inventory not found for sku: " + skuCode);
+        } else {
+            throw new InsufficientStockException("Insufficient stock for sku: " + skuCode);
+        }
+
     }
 
     @Transactional
     public void deleteInventory(String skuCode) {
         log.info("Deleting inventory for skuCode: {}", skuCode);
-        inventoryRepository.deleteBySkuCode(skuCode);
+        long rowsDeleted = inventoryRepository.deleteBySkuCode(skuCode);
+        if (rowsDeleted == 0) {
+            throw new InventoryNotFoundException("Inventory not found for sku: " + skuCode);
+        }
     }
 
     private InventoryResponse mapToResponse(Inventory inventory) {
