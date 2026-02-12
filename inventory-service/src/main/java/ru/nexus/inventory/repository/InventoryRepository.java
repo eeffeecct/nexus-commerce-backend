@@ -1,7 +1,7 @@
 package ru.nexus.inventory.repository;
 
 import lombok.RequiredArgsConstructor;
-import org.springframework.dao.EmptyResultDataAccessException;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
@@ -10,6 +10,7 @@ import org.springframework.stereotype.Repository;
 import ru.nexus.inventory.entity.Inventory;
 
 import java.sql.PreparedStatement;
+import java.sql.Statement;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
@@ -29,31 +30,18 @@ public class InventoryRepository {
 
     public Optional<Inventory> findBySkuCode(String skuCode) {
         String sql = "SELECT * FROM t_inventory WHERE sku_code = ?";
-        try {
-            Inventory inventory = jdbcTemplate.queryForObject(sql, inventoryRowMapper, skuCode);
-            return Optional.ofNullable(inventory);
-        } catch (EmptyResultDataAccessException e) {
-            return Optional.empty();
-        }
+        return jdbcTemplate.query(sql, inventoryRowMapper, skuCode).stream().findFirst();
     }
 
     public List<Inventory> findAllBySkuCodeIn(List<String> skuCodes) {
         if (skuCodes == null || skuCodes.isEmpty()) {
             return Collections.emptyList();
         }
+        // Use batching for >32k entities
         String placeholders = String.join(",", Collections.nCopies(skuCodes.size(), "?"));
-        String sql = "SELECT * FROM t_inventory WHERE sku_code IN (" + placeholders + ")";
-        return jdbcTemplate.query(sql, inventoryRowMapper, skuCodes.toArray());
-    }
+        String sql = String.format("SELECT * FROM t_inventory WHERE sku_code IN (%s)", placeholders);
 
-    public Optional<Inventory> findBySkuCodeAndQuantityGreaterThanEqual(String skuCode, Integer quantity) {
-        String sql = "SELECT * FROM t_inventory WHERE sku_code = ? AND quantity >= ? FOR UPDATE";
-        try {
-            Inventory inventory = jdbcTemplate.queryForObject(sql, inventoryRowMapper, skuCode, quantity);
-            return Optional.ofNullable(inventory);
-        } catch (EmptyResultDataAccessException e) {
-            return Optional.empty();
-        }
+        return jdbcTemplate.query(sql, inventoryRowMapper, skuCodes.toArray());
     }
 
     public boolean existsBySkuCode(String skuCode) {
@@ -64,46 +52,64 @@ public class InventoryRepository {
 
     public void saveInventory(Inventory inventory) {
         if (inventory.getId() == null) {
-            String sql = "INSERT INTO t_inventory (sku_code, quantity, version) VALUES (?, ?, 0)";
-            KeyHolder keyHolder = new GeneratedKeyHolder();
-
-            jdbcTemplate.update(connection -> {
-                PreparedStatement ps = connection.prepareStatement(sql, new String[]{"id"});
-                ps.setString(1, inventory.getSkuCode());
-                ps.setInt(2, inventory.getQuantity());
-                return ps;
-            }, keyHolder);
-
-            Number key = keyHolder.getKey();
-            if (key != null) {
-                inventory.setId(key.longValue());
-                inventory.setVersion(0);
-            }
+            insert(inventory);
         } else {
-            String sql = "UPDATE t_inventory SET sku_code = ?, quantity = ?, version = version + 1 " +
-                         " WHERE id = ? AND version = ?";
-            int rowsAffected = jdbcTemplate.update(sql,
-                    inventory.getSkuCode(),
-                    inventory.getQuantity(),
-                    inventory.getId(),
-                    inventory.getVersion());
-
-            if (rowsAffected == 0) {
-                throw new RuntimeException("Optimistic lock failed: Record was updated by another user or version mismatch");
-            }
-
-            inventory.setVersion(inventory.getVersion() + 1);
+            update(inventory);
         }
     }
 
+    private void insert(Inventory inventory) {
+        String sql = "INSERT INTO t_inventory (sku_code, quantity, version) VALUES (?, ?, ?)";
+        KeyHolder keyHolder = new GeneratedKeyHolder();
+
+        inventory.setVersion(0);
+
+        jdbcTemplate.update(connection -> {
+            PreparedStatement ps = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS);
+            ps.setString(1, inventory.getSkuCode());
+            ps.setInt(2, inventory.getQuantity());
+            ps.setInt(3, inventory.getVersion());
+            return ps;
+        }, keyHolder);
+
+        Number key = keyHolder.getKey();
+        if (key != null) {
+            inventory.setId(key.longValue());
+        }
+    }
+
+    private void update(Inventory inventory) {
+        String sql = """
+                UPDATE t_inventory 
+                SET sku_code = ?, quantity = ?, version = version + 1 
+                WHERE id = ? AND version = ?
+                """;
+
+        int rowsAffected = jdbcTemplate.update(sql,
+                inventory.getSkuCode(),
+                inventory.getQuantity(),
+                inventory.getId(),
+                inventory.getVersion());
+
+        if (rowsAffected == 0) {
+            throw new OptimisticLockingFailureException("Inventory modified by another transaction");
+        }
+
+        inventory.setVersion(inventory.getVersion() + 1);
+    }
+
     public int updateQuantity(String skuCode, Integer delta) {
-        String sql = "UPDATE t_inventory SET quantity = quantity + ? " +
-                     "WHERE sku_code = ? AND (quantity + ?) >= 0";
+        String sql = """
+                UPDATE t_inventory 
+                SET quantity = quantity + ? 
+                WHERE sku_code = ? AND (quantity + ?) >= 0
+                """;
+
         return jdbcTemplate.update(sql, delta, skuCode, delta);
     }
 
-    public void deleteBySkuCode(String skuCode) {
+    public int deleteBySkuCode(String skuCode) {
         String sql = "DELETE FROM t_inventory WHERE sku_code = ?";
-        jdbcTemplate.update(sql, skuCode);
+        return jdbcTemplate.update(sql, skuCode);
     }
 }
