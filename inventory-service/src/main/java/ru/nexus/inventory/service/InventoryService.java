@@ -20,6 +20,15 @@ import java.util.List;
 public class InventoryService {
     private final InventoryRepository inventoryRepository;
 
+    private InventoryResponse mapToResponse(Inventory inventory) {
+        return InventoryResponse.builder()
+                .skuCode(inventory.getSkuCode())
+                .isInStock(inventory.getQuantity() > 0)
+                .quantity(inventory.getQuantity())
+                .version(inventory.getVersion())
+                .build();
+    }
+
     @Transactional(readOnly = true)
     public InventoryResponse getStockStatus(String skuCode) {
         return inventoryRepository.findBySkuCode(skuCode)
@@ -33,11 +42,44 @@ public class InventoryService {
     }
 
     @Transactional(readOnly = true)
+    public InventoryResponse getInventoryDetails(String skuCode) {
+        log.info("Get inventory details for: {}", skuCode);
+        return inventoryRepository.findBySkuCode(skuCode)
+                .map(this::mapToResponse)
+                .orElseThrow(() -> new InventoryNotFoundException("Inventory record missing for: " + skuCode));
+    }
+
+    @Transactional
     public List<InventoryResponse> getStockStatuses(List<String> skuCodes) {
         log.info("Checking stock statuses for: {}", skuCodes);
-        return inventoryRepository.findAllBySkuCodeIn(skuCodes).stream()
+        return inventoryRepository.findAllBySkuCodes(skuCodes).stream()
                 .map(this::mapToResponse)
                 .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public void checkAvailability(List<InventoryRequest> requestList) {
+        List<String> skuCodes = requestList.stream()
+                .map(InventoryRequest::getSkuCode)
+                .toList();
+
+        long uniqueRequestedCount = requestList.stream().map(InventoryRequest::getSkuCode).distinct().count();
+
+        List<Inventory> inventoryList = inventoryRepository.findAllBySkuCodes(skuCodes);
+
+        if (inventoryList.size() != uniqueRequestedCount) {
+            throw new InventoryNotFoundException("Some products are missing in inventory");
+        }
+
+        for (InventoryRequest request : requestList) {
+            Inventory stock = inventoryList.stream()
+                    .filter(inv -> inv.getSkuCode().equals(request.getSkuCode()))
+                    .findFirst()
+                    .orElseThrow(() -> new InventoryNotFoundException("SKU not found: " + request.getSkuCode()));
+            if (stock.getQuantity() < request.getQuantity()) {
+                throw new InsufficientStockException("Not enough stock for SKU: " + request.getSkuCode());
+            }
+        }
     }
 
     @Transactional
@@ -57,7 +99,7 @@ public class InventoryService {
     @Transactional
     public void updateInventory(InventoryRequest request) {
         log.info("Updating inventory for skuCode: {}", request.getSkuCode());
-        
+
         Inventory inventory = inventoryRepository.findBySkuCode(request.getSkuCode())
                 .orElseThrow(() -> new InventoryNotFoundException("Inventory not found for skuCode: " + request.getSkuCode()));
 
@@ -86,7 +128,14 @@ public class InventoryService {
         } else {
             throw new InsufficientStockException("Insufficient stock for sku: " + skuCode);
         }
+    }
 
+    @Transactional
+    public void reserveStock(List<InventoryRequest> requestList, Integer delta) {
+        log.info("Reserving stock for items: {} ", requestList);
+        for (InventoryRequest request : requestList) {
+            adjustStock(request.getSkuCode(), -request.getQuantity());
+        }
     }
 
     @Transactional
@@ -96,14 +145,5 @@ public class InventoryService {
         if (rowsDeleted == 0) {
             throw new InventoryNotFoundException("Inventory not found for sku: " + skuCode);
         }
-    }
-
-    private InventoryResponse mapToResponse(Inventory inventory) {
-        return InventoryResponse.builder()
-                .skuCode(inventory.getSkuCode())
-                .isInStock(inventory.getQuantity() > 0)
-                .quantity(inventory.getQuantity())
-                .version(inventory.getVersion())
-                .build();
     }
 }
