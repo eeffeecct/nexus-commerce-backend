@@ -4,6 +4,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
+import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
 import org.springframework.jdbc.support.KeyHolder;
 import org.springframework.stereotype.Repository;
@@ -20,6 +22,7 @@ import java.util.Optional;
 public class InventoryRepository {
 
     private final JdbcTemplate jdbcTemplate;
+    private final NamedParameterJdbcTemplate namedParameterJdbcTemplate;
 
     private final RowMapper<Inventory> inventoryRowMapper = (rs, rowNum) -> Inventory.builder()
             .id(rs.getLong("id"))
@@ -28,26 +31,28 @@ public class InventoryRepository {
             .version(rs.getInt("version"))
             .build();
 
+
     public Optional<Inventory> findBySkuCode(String skuCode) {
-        String sql = "SELECT * FROM t_inventory WHERE sku_code = ?";
+        String sql = "SELECT * FROM t_inventory WHERE sku_code = ? LIMIT 1";
         return jdbcTemplate.query(sql, inventoryRowMapper, skuCode).stream().findFirst();
-    }
-
-    public List<Inventory> findAllBySkuCodeIn(List<String> skuCodes) {
-        if (skuCodes == null || skuCodes.isEmpty()) {
-            return Collections.emptyList();
-        }
-        // Use batching for >32k entities
-        String placeholders = String.join(",", Collections.nCopies(skuCodes.size(), "?"));
-        String sql = String.format("SELECT * FROM t_inventory WHERE sku_code IN (%s)", placeholders);
-
-        return jdbcTemplate.query(sql, inventoryRowMapper, skuCodes.toArray());
     }
 
     public boolean existsBySkuCode(String skuCode) {
         String sql = "SELECT count(*) FROM t_inventory WHERE sku_code = ?";
         Integer count = jdbcTemplate.queryForObject(sql, Integer.class, skuCode);
         return count != null && count > 0;
+    }
+
+    public List<Inventory> findAllBySkuCodes(List<String> skuCodes) {
+        if (skuCodes == null || skuCodes.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        String sql = "SELECT id, sku_code, quantity, version FROM t_inventory WHERE sku_code IN (:skuCodes)";
+
+        var params = new MapSqlParameterSource("skuCodes", skuCodes);
+
+        return namedParameterJdbcTemplate.query(sql, params, inventoryRowMapper);
     }
 
     public void saveInventory(Inventory inventory) {
