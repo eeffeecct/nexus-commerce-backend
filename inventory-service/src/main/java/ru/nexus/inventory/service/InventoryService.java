@@ -131,7 +131,7 @@ public class InventoryService {
     }
 
     @Transactional
-    public void reserveStock(List<InventoryRequest> requestList, Integer delta) {
+    public void reserveStock(List<InventoryRequest> requestList) {
         log.info("Reserving stock for items: {} ", requestList);
         for (InventoryRequest request : requestList) {
             adjustStock(request.getSkuCode(), -request.getQuantity());
