@@ -22,6 +22,7 @@ import java.util.Map;
 public class Product {
     @Id
     private String id;
+    private String skuCode;
     private String title;
     private BigDecimal price;
     private String category;

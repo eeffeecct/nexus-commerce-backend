@@ -14,6 +14,7 @@ import java.util.Map;
 @AllArgsConstructor
 public class ProductResponse {
     private String id;
+    private String skuCode;
     private String title;
     private BigDecimal price;
     private String category;

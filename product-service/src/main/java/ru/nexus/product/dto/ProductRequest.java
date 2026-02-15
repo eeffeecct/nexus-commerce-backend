@@ -16,6 +16,9 @@ import java.util.Map;
 @NoArgsConstructor
 @AllArgsConstructor
 public class ProductRequest {
+    @NotBlank(message = "SKU Code must not be blank")
+    private String skuCode;
+
     @NotBlank
     private String title;
     @NotNull(message = "Price must be not null")
