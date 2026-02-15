@@ -61,6 +61,11 @@ public class InventoryController {
         inventoryService.adjustStock(request.getSkuCode(), request.getQuantity());
     }
 
+    @PutMapping("/set-balance")
+    public void setBalance(@RequestBody InventoryRequest request) {
+        inventoryService.updateInventory(request);
+    }
+
     // Удаление записи
     @DeleteMapping("/{skuCode}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
