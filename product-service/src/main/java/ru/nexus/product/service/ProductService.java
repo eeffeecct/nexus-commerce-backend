@@ -21,6 +21,7 @@ import org.springframework.data.domain.Pageable;
 public class ProductService {
     private final ProductRepository repository;
     private final ProductMapper mapper;
+    private final org.springframework.amqp.rabbit.core.RabbitTemplate rabbitTemplate;
 
     public Page<ProductResponse> getAllProducts(Pageable pageable) {
         log.info("Fetching all products with pagination: {}", pageable);
@@ -37,10 +38,28 @@ public class ProductService {
     }
 
     public ProductResponse createProduct(ProductRequest productRequest) {
-        log.info("Creating new product with title: {}", productRequest.getTitle());
+        log.info("Creating new product with skuCode: {}", productRequest.getSkuCode());
         Product product = mapper.toEntity(productRequest);
         Product savedProduct = repository.save(product);
-        log.info("Product created successfully with ID: {}", savedProduct.getId());
+        log.info("Product saved to DB with ID: {}", savedProduct.getId());
+
+        // Отправка события в RabbitMQ
+        ru.nexus.common.event.ProductCreatedEvent event = ru.nexus.common.event.ProductCreatedEvent.builder()
+                .skuCode(savedProduct.getSkuCode())
+                .title(savedProduct.getTitle())
+                .build();
+
+        try {
+            log.info("Publishing product created event to RabbitMQ for SKU: {}", savedProduct.getSkuCode());
+            rabbitTemplate.convertAndSend(
+                    ru.nexus.product.config.RabbitMQConfig.PRODUCT_EXCHANGE,
+                    ru.nexus.product.config.RabbitMQConfig.PRODUCT_CREATED_ROUTING_KEY,
+                    event
+            );
+        } catch (Exception e) {
+            log.error("Failed to publish product created event for SKU: {}. Error: {}", savedProduct.getSkuCode(), e.getMessage());
+        }
+
         return mapper.toResponse(savedProduct);
     }
 
