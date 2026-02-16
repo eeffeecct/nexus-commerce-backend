@@ -65,30 +65,21 @@ public class InventoryRepository {
 
     private void insert(Inventory inventory) {
         String sql = "INSERT INTO t_inventory (sku_code, quantity, version) VALUES (?, ?, ?)";
-        KeyHolder keyHolder = new GeneratedKeyHolder();
-
+        
         inventory.setVersion(0);
 
-        jdbcTemplate.update(connection -> {
-            PreparedStatement ps = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS);
-            ps.setString(1, inventory.getSkuCode());
-            ps.setInt(2, inventory.getQuantity());
-            ps.setInt(3, inventory.getVersion());
-            return ps;
-        }, keyHolder);
-
-        Number key = keyHolder.getKey();
-        if (key != null) {
-            inventory.setId(key.longValue());
+        try {
+            jdbcTemplate.update(sql,
+                    inventory.getSkuCode(),
+                    inventory.getQuantity(),
+                    inventory.getVersion());
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to insert inventory for SKU: " + inventory.getSkuCode() + ". SQL: " + sql, e);
         }
     }
 
     private void update(Inventory inventory) {
-        String sql = """
-                UPDATE t_inventory\s
-                SET sku_code = ?, quantity = ?, version = version + 1\s
-                WHERE id = ? AND version = ?
-               \s""";
+        String sql = "UPDATE t_inventory SET sku_code = ?, quantity = ?, version = version + 1 WHERE id = ? AND version = ?";
 
         int rowsAffected = jdbcTemplate.update(sql,
                 inventory.getSkuCode(),
@@ -104,11 +95,7 @@ public class InventoryRepository {
     }
 
     public int updateQuantity(String skuCode, Integer delta) {
-        String sql = """
-                UPDATE t_inventory\s
-                SET quantity = quantity + ?\s
-                WHERE sku_code = ? AND (quantity + ?) >= 0
-               \s""";
+        String sql = "UPDATE t_inventory SET quantity = quantity + ? WHERE sku_code = ? AND (quantity + ?) >= 0";
 
         return jdbcTemplate.update(sql, delta, skuCode, delta);
     }
